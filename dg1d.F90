@@ -14,13 +14,13 @@ program dg1d
 	!-------------------------------------------------------------------------------------------------- !
 	!	PARAMETERS 
 	!-------------------------------------------------------------------------------------------------- 
-	integer, parameter :: Np = 12 ! Number of Gauss-Legendre points (so order is N-1) 
-	integer, parameter :: Nel = 12 ! Number of elements in our domain 
+	integer, parameter :: Np = 10 ! Number of Gauss-Legendre points (so order is N-1) 
+	integer, parameter :: Nel = 5 ! Number of elements in our domain 
 	integer, parameter :: Nt = 2000 ! Number of time steps to run for
 	integer, parameter :: write_interval = 20 ! write data every x timesteps 
 	
-	real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 12.0 ! Total domain to be discretized
-	real(real64), parameter :: c = -0.6 ! Externally-prescribed constant velocity
+	real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 19.0 ! Total domain to be discretized
+	real(real64), parameter :: c = 1.2 ! Externally-prescribed constant velocity
 	real(real64), parameter :: dt = 0.01 ! Time differential
 
 
@@ -81,7 +81,7 @@ program dg1d
 	do i = 1, Np
 		do j = 1, Np
 			! integral of L_m, L'_l
-			stiff(j,i) = sum([( gw(m) * Legendre(gx,i,gx(m)) * LegendrePrime(gx+2*epsilon(gx),j,gx(m)) , m=1, Np )])
+			stiff(j,i) = sum([( gw(m) * Legendre(gx,i,gx(m)) * LegendrePrime(gx,j,gx(m)+epsilon(gx)) , m=1, Np )])
 		end do
 	end do	
 
