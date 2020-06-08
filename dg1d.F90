@@ -16,11 +16,11 @@ program dg1d
 	!-------------------------------------------------------------------------------------------------- 
 	integer, parameter :: Np = 12 ! Number of Gauss-Legendre points (so order is N-1) 
 	integer, parameter :: Nel = 12 ! Number of elements in our domain 
-	integer, parameter :: Nt = 2000 ! Number of time steps 
+	integer, parameter :: Nt = 2000 ! Number of time steps to run for
 	integer, parameter :: write_interval = 20 ! write data every x timesteps 
 	
 	real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 12.0 ! Total domain to be discretized
-	real(real64), parameter :: c = 0.6 ! Externally-prescribed constant velocity
+	real(real64), parameter :: c = -0.6 ! Externally-prescribed constant velocity
 	real(real64), parameter :: dt = 0.01 ! Time differential
 
 
@@ -99,6 +99,7 @@ program dg1d
 
 		do t = 0, Nt-1
 
+			! If we need to output some data for plotting...
 			if((mod(t,write_interval) .eq. 0) .or. (t .eq. Nt-1)) then
 				do l = 1, Nel
 					xreal = gx
@@ -152,32 +153,48 @@ contains
 		real(real64), intent(in) :: q(Np,Nel)
 		real(real64), intent(out) :: qprime(Np,Nel)
 
+		real(real64) :: x_L, x_R ! "left" and "right" element boundaries, in [-1,1] (i.e. either -1 or 1)
+
 		integer(int64) :: i, j ! Iterators, no special meaning
 
 		integer :: iPrev   ! Index of previous element
-		real(real64) :: x_L, x_R            ! x coord of left and right element endpoint
 		real(real64) :: qR(Np), qRprev(Np)  ! q-vector on the right endpt of this elmnt and upwind elmnt
 		real(real64) :: flx(Np) ! flux-vector
+		real(real64) :: delta_x ! size of element
 
 
 
 		! This is probably inefficient, but I'm going to loop over elements and solve them one at a time. 
 		do i = 1, Nel
-			iPrev = i-1
-			if (iPrev .eq. 0) iPrev = Nel
 
-			x_L = elementPtsLR(1,i)
-			x_R = elementPtsLR(2,i)
+			! To accomodate our upwind difference scheme for the flux, we need to know whether c is positive 
+			if (c >= 0) then
+				! Apply periodic BC, set iPrev to be the upwind element
+				iPrev = i-1
+				if (iPrev == 0) iPrev = Nel
+				x_L = -1.0_real64
+				x_R = 1.0_real64
+			else 
+				! Apply periodic BC, set iPrev to be the upwind element
+				! if c is negative we swap xL and xR because we need to evaluate at the opposite element boundary
+				iPrev = i+1
+				if (iPrev > Nel) iPrev = 1
+				x_L = 1.0_real64
+				x_R = -1.0_real64
+			end if 
+
+			delta_x = elementPtsLR(2,i) - elementPtsLR(1,i)
 
 			! Populate flx
-			! Upwind difference, technically only valid for c > 0 I think
-			qR     = sum([( Legendre(gx,j,1.0_real64)  * q(j,i)      , j=1, Np )])
-			qRprev = sum([( Legendre(gx,j,1.0_real64) * q(j,iPrev)  , j=1, Np )])
+			! Upwind difference 
+			! Flux = loss - gain
+			qR     = sum([( Legendre(gx,j,x_R)  * q(j,i)      , j=1, Np )])
+			qRprev = sum([( Legendre(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
 
-			flx = c* [(  qR(j) * Legendre(gx,j,1.0_real64) - qRprev(j) * Legendre(gx,j,-1.0_real64) ,j=1,Np)]
+			flx = abs(c)* [(  qR(j) * Legendre(gx,j,x_R) - qRprev(j) * Legendre(gx,j,x_L) ,j=1,Np)]
 
 			! Calculate qprime
-			qprime(:,i) = 2.0/(gw*(x_R-x_L)) * (c * matmul(stiff,q(:,i)) - flx) 
+			qprime(:,i) = 2.0/(gw*delta_x) * (c * matmul(stiff,q(:,i)) - flx) 
 		end do
 	end subroutine calc_qprime
 
