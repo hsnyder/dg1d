@@ -16,11 +16,11 @@ program dg1d
 	!-------------------------------------------------------------------------------------------------- 
 	integer, parameter :: Np = 12 ! Number of Gauss-Legendre points (so order is N-1) 
 	integer, parameter :: Nel = 12 ! Number of elements in our domain 
-	integer, parameter :: Nt = 1000 ! Number of time steps 
-	integer, parameter :: write_interval = 100 ! write data every x timesteps 
+	integer, parameter :: Nt = 2000 ! Number of time steps 
+	integer, parameter :: write_interval = 20 ! write data every x timesteps 
 	
 	real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 12.0 ! Total domain to be discretized
-	real(real64), parameter :: c = 1.0 ! Externally-prescribed constant velocity
+	real(real64), parameter :: c = 0.6 ! Externally-prescribed constant velocity
 	real(real64), parameter :: dt = 0.01 ! Time differential
 
 
@@ -109,6 +109,7 @@ program dg1d
 					plty(Np*(l-1)+1:Np*l) = q(:,l)
 				end do
 
+				print *, t
 				write (t_string,"(i6.6)") t
 
 				open (newunit=fileunit, file="dg1d."//trim(t_string)//".dat")
