@@ -94,8 +94,6 @@ program dg1d
 	solver: block
 
 		real(real64) :: xreal(Np), garbage(Np), pltx(Np*Nel), plty(Np*Nel)
-		character(len=1024) :: t_string
-		integer :: fileunit
 
 		do t = 0, Nt-1
 
@@ -111,13 +109,7 @@ program dg1d
 				end do
 
 				print *, t
-				write (t_string,"(i6.6)") t
-
-				open (newunit=fileunit, file="dg1d."//trim(t_string)//".dat")
-				write (fileunit, *) pltx
-				write (fileunit, *) plty
-				flush (fileunit)
-				close (fileunit)
+				call savedata(t,pltx,plty)
 
 			end if
 
@@ -291,5 +283,22 @@ contains
 	call forpy_finalize
 	end subroutine wrp_forpy_finalize
 #endif
+
+	subroutine savedata(t,x,y)
+		integer, intent(in) :: t
+		real(real64), intent(in) :: x(:), y(:)
+
+		character(len=1024) :: t_string
+		integer :: fileunit
+
+		write (t_string,"(i6.6)") t
+
+		open (newunit=fileunit, file="dg1d."//trim(t_string)//".dat")
+		write (fileunit, *) x
+		write (fileunit, *) y
+		flush (fileunit)
+		close (fileunit)
+
+	end subroutine savedata
 
 end program dg1d
