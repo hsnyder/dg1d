@@ -14,7 +14,7 @@ program dg1d
 	!-------------------------------------------------------------------------------------------------- !
 	!	PARAMETERS 
 	!-------------------------------------------------------------------------------------------------- 
-	integer, parameter :: Np = 10 ! Number of Gauss-Legendre points (so order is N-1) 
+	integer, parameter :: Np = 10 ! Number of Gauss-Lagrange points (so order is N-1) 
 	integer, parameter :: Nel = 5 ! Number of elements in our domain 
 	integer, parameter :: Nt = 2000 ! Number of time steps to run for
 	integer, parameter :: write_interval = 20 ! write data every x timesteps 
@@ -81,7 +81,7 @@ program dg1d
 	do i = 1, Np
 		do j = 1, Np
 			! integral of L_m, L'_l
-			stiff(j,i) = sum([( gw(m) * Legendre(gx,i,gx(m)) * LegendrePrime(gx,j,gx(m)+epsilon(gx)) , m=1, Np )])
+			stiff(j,i) = sum([( gw(m) * Lagrange(gx,i,gx(m)) * LagrangePrime(gx,j,gx(m)+epsilon(gx)) , m=1, Np )])
 		end do
 	end do	
 
@@ -180,10 +180,10 @@ contains
 			! Populate flx
 			! Upwind difference 
 			! Flux = loss - gain
-			qR     = sum([( Legendre(gx,j,x_R)  * q(j,i)      , j=1, Np )])
-			qRprev = sum([( Legendre(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
+			qR     = sum([( Lagrange(gx,j,x_R)  * q(j,i)      , j=1, Np )])
+			qRprev = sum([( Lagrange(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
 
-			flx = abs(c)* [(  qR(j) * Legendre(gx,j,x_R) - qRprev(j) * Legendre(gx,j,x_L) ,j=1,Np)]
+			flx = abs(c)* [(  qR(j) * Lagrange(gx,j,x_R) - qRprev(j) * Lagrange(gx,j,x_L) ,j=1,Np)]
 
 			! Calculate qprime
 			qprime(:,i) = 2.0/(gw*delta_x) * (c * matmul(stiff,q(:,i)) - flx) 
@@ -191,9 +191,9 @@ contains
 	end subroutine calc_qprime
 
 
-	! value of the k-th Legendre polynomial on the [-1,1] domain at point x
-	! xr and w are passed in as the roots for Gauss-Legendre quadrature
-	real(real64) pure function Legendre(xr, k, x)
+	! value of the k-th Lagrange polynomial on the [-1,1] domain at point x
+	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
+	real(real64) pure function Lagrange(xr, k, x)
 		integer(int64),intent(in) :: k
 		real(real64),intent(in) :: xr(:),  x
 
@@ -207,13 +207,13 @@ contains
 				L = L * (x - xr(m))/(xr(k) - xr(m))
 			end if
 		end do
-		Legendre = L
-	end function Legendre
+		Lagrange = L
+	end function Lagrange
 
-	! value of the derivative of the k-th Legendre polynomial on the [-1,1] domain at point x
-	! xr and w are passed in as the roots for Gauss-Legendre quadrature
+	! value of the derivative of the k-th Lagrange polynomial on the [-1,1] domain at point x
+	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
 	! Calculation takes advantage of log differentiation, f'/f = log(f)'
-	real(real64) pure function LegendrePrime(xr,k,x)
+	real(real64) pure function LagrangePrime(xr,k,x)
 		integer(int64),intent(in) :: k
 		real(real64),intent(in) :: xr(:), x
 
@@ -227,7 +227,7 @@ contains
 			end if
 		end do
 
-		LegendrePrime = L * Legendre(xr,k,x)
+		LagrangePrime = L * Lagrange(xr,k,x)
 	end function
 
 #if 0

@@ -26,7 +26,7 @@
 
 		a = a / (4*N+2) 
 
-		! Initial guess of Legendre polynomial roots 
+		! Initial guess of Lagrange polynomial roots 
 		x = cos(pi*a + 1/(8*N*N*tan(a))) 
 		
 		! Find roots using Newton's method 
