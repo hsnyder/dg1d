@@ -187,11 +187,11 @@ contains
 !	end function
 
 
-	pure function qprime_el(Nel, Np, gx, stiff, massinv, lineJac, c, q, prevBdyVal, nextBdyVal, i )
+	pure function qprime_el(Nel, Np, gx, stiff, massinv, lineJac, cBkwd, cFwd, q , prevBdyVal, nextBdyVal, i )
 		integer, intent(in) :: Nel, Np, i ! i is the ith element
 		real(real64), intent(in) :: gx(Np), stiff(Np,Np)
 		real(real64), intent(in) :: q(Np), massinv(Np,Np), lineJac(Np), prevBdyVal, nextBdyVal
-		real(real64), intent(in) :: c
+		real(real64), intent(in) :: cFwd, cBkwd
 		real(real64) :: qprime_el(Np)
 
 		integer :: j ! Iterators, no special meaning
@@ -203,14 +203,13 @@ contains
 		! Flux = loss - gain
 		
 		flx = 0
-		if (c>=0) then ! losing at top end, gaining at lower end
-			flx(1) = -prevBdyVal 
-			flx(Np) = q(Np)
+		if (cFwd>=0) then ! losing at top end, gaining at lower end
+			flx(1) = cBkwd*prevBdyVal
+			flx(Np) = cFwd*q(Np)
 		else ! losing at bottom end, gaining at top end
-			flx(1) = q(1)
-			flx(Np) = -nextBdyVal
+			flx(1) = cBkwd*q(1)
+			flx(Np) = cFwd*nextBdyVal
 		end if
-		flx = flx * abs(c)
 
 		! Calculate qprime
 		qprime_el = lineJac * matmul(massinv, (c * matmul(stiff,q) - flx) )
@@ -252,7 +251,7 @@ contains
 			if(iPrev < 1) iPrev = Nel
 
 			! Calculate qprime
-			qprime(:,i) = qprime_el(Nel, Np, gx, stiff, massinv1d, Jac, c, q(:,i), q(Np,iPrev), q(1,iNext), i)
+			qprime(:,i) = qprime_el(Nel, Np, gx, stiff, massinv1d, Jac, -c, c, q(:,i), q(Np,iPrev), q(1,iNext), i)
 		end do
 	end subroutine calc_qprime
 
