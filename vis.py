@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation,writers
 import glob
 
-datfiles = glob.glob('dg1d.*.dat')
+datfiles = glob.glob('output.*.dat')
 
 data = dict()
 

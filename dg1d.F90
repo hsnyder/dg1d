@@ -4,6 +4,7 @@
 ! 		d/dt q(x) + d/dx f(q(x)) = 0 
 !  
 !========================================================================================================== 
+
 program dg1d 
 
 	use iso_fortran_env, only: real64, int64 
@@ -56,8 +57,8 @@ program dg1d
 	elementPtsLR(2,:) = linspace(2:Nel+1)
 
 	! Calculate gaussian quadrature points and weights
-	call GL_Points(gx) 
-	call GL_Weights(gx, gw)
+	call GLL_Points(gx) 
+	call GLL_Weights(gx, gw)
 
 
 	! Initial conditions
@@ -139,6 +140,52 @@ program dg1d
 	
 
 contains
+! GL version
+!	pure function qprime_el(Nel, Np, gx, stiff, massinv, lineJac, c, q, i )
+!		integer, intent(in) :: Nel, Np, i ! i is the ith element
+!		real(real64), intent(in) :: gx(Np), stiff(Np,Np)
+!		real(real64), intent(in) :: q(Np,Nel), massinv(Np,Np), lineJac(Np)
+!		real(real64), intent(in) :: c
+!		real(real64) :: qprime_el(Np)
+!
+!		real(real64) :: x_L, x_R ! "left" and "right" element boundaries, in [-1,1] (i.e. either -1 or 1)
+!
+!		integer :: j ! Iterators, no special meaning
+!
+!		integer :: iPrev   ! Index of previous element
+!		real(real64) :: qR(Np), qRprev(Np)  ! q-vector on the right endpt of this elmnt and upwind elmnt
+!		real(real64) :: flx(Np) ! flux-vector
+!
+!		! To accomodate our upwind difference scheme for the flux, we need to know whether c is positive 
+!		if (c >= 0) then
+!			! Apply periodic BC, set iPrev to be the upwind element
+!			iPrev = i-1
+!			if (iPrev == 0) iPrev = Nel
+!			x_L = -1.0_real64
+!			x_R = 1.0_real64
+!		else 
+!			! Apply periodic BC, set iPrev to be the upwind element
+!			! if c is negative we swap xL and xR because we need to evaluate at the opposite element boundary
+!			iPrev = i+1
+!			if (iPrev > Nel) iPrev = 1
+!			x_L = 1.0_real64
+!			x_R = -1.0_real64
+!		end if 
+!
+!
+!		! Populate flx
+!		! Upwind difference 
+!		! Flux = loss - gain
+!		qR     = sum([( Lagrange(gx,j,x_R)  * q(j,i)      , j=1, Np )])
+!		qRprev = sum([( Lagrange(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
+!
+!		flx = abs(c)* [(  qR(j) * Lagrange(gx,j,x_R) - qRprev(j) * Lagrange(gx,j,x_L) ,j=1,Np)]
+!
+!		! Calculate qprime
+!		qprime_el = lineJac * matmul(massinv, (c * matmul(stiff,q(:,i)) - flx) )
+!
+!	end function
+
 
 	pure function qprime_el(Nel, Np, gx, stiff, massinv, lineJac, c, q, i )
 		integer, intent(in) :: Nel, Np, i ! i is the ith element
@@ -147,38 +194,32 @@ contains
 		real(real64), intent(in) :: c
 		real(real64) :: qprime_el(Np)
 
-		real(real64) :: x_L, x_R ! "left" and "right" element boundaries, in [-1,1] (i.e. either -1 or 1)
-
 		integer :: j ! Iterators, no special meaning
 
-		integer :: iPrev   ! Index of previous element
-		real(real64) :: qR(Np), qRprev(Np)  ! q-vector on the right endpt of this elmnt and upwind elmnt
+		integer :: iPrev, iNext
 		real(real64) :: flx(Np) ! flux-vector
 
 		! To accomodate our upwind difference scheme for the flux, we need to know whether c is positive 
-		if (c >= 0) then
-			! Apply periodic BC, set iPrev to be the upwind element
-			iPrev = i-1
-			if (iPrev == 0) iPrev = Nel
-			x_L = -1.0_real64
-			x_R = 1.0_real64
-		else 
-			! Apply periodic BC, set iPrev to be the upwind element
-			! if c is negative we swap xL and xR because we need to evaluate at the opposite element boundary
-			iPrev = i+1
-			if (iPrev > Nel) iPrev = 1
-			x_L = 1.0_real64
-			x_R = -1.0_real64
-		end if 
+		iNext = i+1
+		iPrev = i-1
 
+		! Periodic BC
+		if(iNext > Nel) iNext = 1
+		if(iPrev < 1) iPrev = Nel
 
 		! Populate flx
 		! Upwind difference 
 		! Flux = loss - gain
-		qR     = sum([( Lagrange(gx,j,x_R)  * q(j,i)      , j=1, Np )])
-		qRprev = sum([( Lagrange(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
-
-		flx = abs(c)* [(  qR(j) * Lagrange(gx,j,x_R) - qRprev(j) * Lagrange(gx,j,x_L) ,j=1,Np)]
+		
+		flx = 0
+		if (c>=0) then ! losing at top end, gaining at lower end
+			flx(1) = -q(Np,iPrev)
+			flx(Np) = q(Np,i)
+		else ! losing at bottom end, gaining at top end
+			flx(1) = q(1,i)
+			flx(Np) = -q(1,iNext)
+		end if
+		flx = flx * abs(c)
 
 		! Calculate qprime
 		qprime_el = lineJac * matmul(massinv, (c * matmul(stiff,q(:,i)) - flx) )
@@ -224,7 +265,7 @@ contains
 
 		write (t_string,"(i6.6)") t
 
-		open (newunit=fileunit, file="dg1d."//trim(t_string)//".dat")
+		open (newunit=fileunit, file="output."//trim(t_string)//".dat")
 		write (fileunit, *) x
 		write (fileunit, *) y
 		flush (fileunit)
