@@ -26,6 +26,7 @@ def animate(i):
     dat = data[sortedkeys[i]]
     ax.clear()
     ax.plot(dat[0], dat[1], '.')
+    print (sortedkeys[i])
 
     rms = str(n.sqrt(n.mean(n.square(dat[1]))))
 

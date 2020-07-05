@@ -33,7 +33,7 @@ program dg1d
 
 	real(real64) :: gx(Np), gw(Np)  ! Gaussian quadrature points and weights
 
-	integer(int64) :: i, j, l, m    ! Iterators, no special meaning
+	integer :: i, j, l, m    ! Iterators, no special meaning
 	integer :: t ! current time
 	real(real64) :: stiff(Np,Np)    ! Stiffness matrix
 
@@ -139,54 +139,78 @@ program dg1d
 
 contains
 
-	subroutine calc_qprime(Nel, Np, elementPtsLR, gx, gw, stiff, q, qprime)
-		integer, intent(in) :: Nel, Np
-		real(real64), intent(in) :: elementPtsLR(2,Nel), gx(Np), gw(Np), stiff(Np,Np)
-		real(real64), intent(in) :: q(Np,Nel)
-		real(real64), intent(out) :: qprime(Np,Nel)
+	pure function qprime_el(Nel, Np, gx, stiff, massinv, lineJac, c, q, i )
+		integer, intent(in) :: Nel, Np, i ! i is the ith element
+		real(real64), intent(in) :: gx(Np), stiff(Np,Np)
+		real(real64), intent(in) :: q(Np,Nel), massinv(Np,Np), lineJac(Np)
+		real(real64), intent(in) :: c
+		real(real64) :: qprime_el(Np)
 
 		real(real64) :: x_L, x_R ! "left" and "right" element boundaries, in [-1,1] (i.e. either -1 or 1)
 
-		integer(int64) :: i, j ! Iterators, no special meaning
+		integer :: j ! Iterators, no special meaning
 
 		integer :: iPrev   ! Index of previous element
 		real(real64) :: qR(Np), qRprev(Np)  ! q-vector on the right endpt of this elmnt and upwind elmnt
 		real(real64) :: flx(Np) ! flux-vector
-		real(real64) :: delta_x ! size of element
+
+		! To accomodate our upwind difference scheme for the flux, we need to know whether c is positive 
+		if (c >= 0) then
+			! Apply periodic BC, set iPrev to be the upwind element
+			iPrev = i-1
+			if (iPrev == 0) iPrev = Nel
+			x_L = -1.0_real64
+			x_R = 1.0_real64
+		else 
+			! Apply periodic BC, set iPrev to be the upwind element
+			! if c is negative we swap xL and xR because we need to evaluate at the opposite element boundary
+			iPrev = i+1
+			if (iPrev > Nel) iPrev = 1
+			x_L = 1.0_real64
+			x_R = -1.0_real64
+		end if 
+
+
+		! Populate flx
+		! Upwind difference 
+		! Flux = loss - gain
+		qR     = sum([( Lagrange(gx,j,x_R)  * q(j,i)      , j=1, Np )])
+		qRprev = sum([( Lagrange(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
+
+		flx = abs(c)* [(  qR(j) * Lagrange(gx,j,x_R) - qRprev(j) * Lagrange(gx,j,x_L) ,j=1,Np)]
+
+		! Calculate qprime
+		qprime_el = lineJac * matmul(massinv, (c * matmul(stiff,q(:,i)) - flx) )
+
+	end function
+
+
+
+
+	subroutine calc_qprime(Nel, Np, elementPtsLR, gx, gw, stiff, q, qprime)
+		integer, intent(in) :: Nel, Np
+		real(real64), intent(in) :: elementPtsLR(2,Nel), gx(Np), gw(Np), stiff(Np,Np)
+		real(real64), intent(in) :: q(Np,Nel)
+		real(real64), intent(out) :: qprime(Np,Nel) 
+
+		real(real64) :: delta_x, Jac(Np) ! size of element
+
+		integer :: i ! Iterators, no special meaning
+
+		real(real64) :: massinv1d(Np,Np)
+		massinv1d = 0
+		do i = 1, Np
+			massinv1d(i,i) = 1.0/gw(i)
+		end do
 
 
 
 		! This is probably inefficient, but I'm going to loop over elements and solve them one at a time. 
 		do i = 1, Nel
-
-			! To accomodate our upwind difference scheme for the flux, we need to know whether c is positive 
-			if (c >= 0) then
-				! Apply periodic BC, set iPrev to be the upwind element
-				iPrev = i-1
-				if (iPrev == 0) iPrev = Nel
-				x_L = -1.0_real64
-				x_R = 1.0_real64
-			else 
-				! Apply periodic BC, set iPrev to be the upwind element
-				! if c is negative we swap xL and xR because we need to evaluate at the opposite element boundary
-				iPrev = i+1
-				if (iPrev > Nel) iPrev = 1
-				x_L = 1.0_real64
-				x_R = -1.0_real64
-			end if 
-
 			delta_x = elementPtsLR(2,i) - elementPtsLR(1,i)
-
-			! Populate flx
-			! Upwind difference 
-			! Flux = loss - gain
-			qR     = sum([( Lagrange(gx,j,x_R)  * q(j,i)      , j=1, Np )])
-			qRprev = sum([( Lagrange(gx,j,x_R)  * q(j,iPrev)  , j=1, Np )])
-
-			flx = abs(c)* [(  qR(j) * Lagrange(gx,j,x_R) - qRprev(j) * Lagrange(gx,j,x_L) ,j=1,Np)]
-
+			Jac = [(2.0/(delta_x), i = 1, Np)]
 			! Calculate qprime
-			qprime(:,i) = 2.0/(gw*delta_x) * (c * matmul(stiff,q(:,i)) - flx) 
+			qprime(:,i) = qprime_el(Nel, Np, gx, stiff, massinv1d, Jac, c, q, i)
 		end do
 	end subroutine calc_qprime
 
@@ -194,11 +218,11 @@ contains
 	! value of the k-th Lagrange polynomial on the [-1,1] domain at point x
 	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
 	real(real64) pure function Lagrange(xr, k, x)
-		integer(int64),intent(in) :: k
+		integer,intent(in) :: k
 		real(real64),intent(in) :: xr(:),  x
 
 		real(real64) :: L
-		integer(int64) :: m
+		integer :: m
 		L = 1.0
 
 		! Newman, p. 165
@@ -214,11 +238,11 @@ contains
 	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
 	! Calculation takes advantage of log differentiation, f'/f = log(f)'
 	real(real64) pure function LagrangePrime(xr,k,x)
-		integer(int64),intent(in) :: k
+		integer,intent(in) :: k
 		real(real64),intent(in) :: xr(:), x
 
 		real(real64) :: L
-		integer(int64) :: m
+		integer :: m
 		L = 0.0
 
 		do m = 1,size(xr)
