@@ -7,7 +7,7 @@
 program dg1d 
 
 	use iso_fortran_env, only: real64, int64 
-	use mod_gaussian_quadrature 
+	use m_quadrature
 	
 	implicit none 
 	
@@ -56,7 +56,8 @@ program dg1d
 	elementPtsLR(2,:) = linspace(2:Nel+1)
 
 	! Calculate gaussian quadrature points and weights
-	call gaussxw(Np, gx, gw) 
+	call GL_Points(gx) 
+	call GL_Weights(gx, gw)
 
 
 	! Initial conditions
@@ -81,7 +82,7 @@ program dg1d
 	do i = 1, Np
 		do j = 1, Np
 			! integral of L_m, L'_l
-			stiff(j,i) = sum([( gw(m) * Lagrange(gx,i,gx(m)) * LagrangePrime(gx,j,gx(m)+epsilon(gx)) , m=1, Np )])
+			stiff(j,i) = sum([( gw(m) * Lagrange(gx,i,gx(m)) * DLagrange(gx,j,gx(m)+epsilon(gx)) , m=1, Np )])
 		end do
 	end do	
 
@@ -214,100 +215,6 @@ contains
 		end do
 	end subroutine calc_qprime
 
-
-	! value of the k-th Lagrange polynomial on the [-1,1] domain at point x
-	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
-	real(real64) pure function Lagrange(xr, k, x)
-		integer,intent(in) :: k
-		real(real64),intent(in) :: xr(:),  x
-
-		real(real64) :: L
-		integer :: m
-		L = 1.0
-
-		! Newman, p. 165
-		do m = 1,size(xr)
-			if (m /= k) then
-				L = L * (x - xr(m))/(xr(k) - xr(m))
-			end if
-		end do
-		Lagrange = L
-	end function Lagrange
-
-	! value of the derivative of the k-th Lagrange polynomial on the [-1,1] domain at point x
-	! xr and w are passed in as the roots for Gauss-Lagrange quadrature
-	! Calculation takes advantage of log differentiation, f'/f = log(f)'
-	real(real64) pure function LagrangePrime(xr,k,x)
-		integer,intent(in) :: k
-		real(real64),intent(in) :: xr(:), x
-
-		real(real64) :: L
-		integer :: m
-		L = 0.0
-
-		do m = 1,size(xr)
-			if (m /= k) then
-				L = L + 1.0/(x-xr(m))
-			end if
-		end do
-
-		LagrangePrime = L * Lagrange(xr,k,x)
-	end function
-
-#if 0
-	subroutine simple_plot(x, y)
-		real(real64), asynchronous, intent(in) :: x(:)
-		real(real64), asynchronous, intent(in) :: y(:)
-
-		integer :: pyerr
-		type(module_py) :: plt
-		type(tuple) :: args    
-		type(ndarray) :: x_arr, y_arr
-
-		pyerr = import_py(plt, "matplotlib.pyplot")
-		errchk
-
-		pyerr = ndarray_create_nocopy(x_arr, x)
-		errchk
-
-		pyerr = ndarray_create_nocopy(y_arr, y)
-		errchk
-
-		pyerr = tuple_create(args, 3)
-		errchk
-
-		pyerr = args%setitem(0, x_arr)
-		errchk
-		pyerr = args%setitem(1, y_arr)
-		errchk
-		pyerr = args%setitem(2, "o")
-		errchk
-
-		pyerr = call_py_noret(plt, "plot", args)
-		errchk
-		pyerr = call_py_noret(plt, "grid")
-		errchk
-		pyerr = call_py_noret(plt, "show")
-		errchk
-
-		call x_arr%destroy
-		call y_arr%destroy
-		call args%destroy
-		call plt%destroy
-
-	end subroutine
-
-	subroutine wrp_forpy_initialize
-	integer :: pyerr
-	pyerr = forpy_initialize()
-	errchk
-	end subroutine wrp_forpy_initialize
-
-	subroutine wrp_forpy_finalize
-	call forpy_finalize
-	end subroutine wrp_forpy_finalize
-#endif
-
 	subroutine savedata(t,x,y)
 		integer, intent(in) :: t
 		real(real64), intent(in) :: x(:), y(:)
@@ -324,5 +231,13 @@ contains
 		close (fileunit)
 
 	end subroutine savedata
+
+	subroutine shiftxw(x,w,a,b)
+		real(real64), intent(in out) :: x(:), w(:)
+	       	real(real64), intent(in) :: a, b
+		x = 0.5*(b-a)*x+0.5*(b+a)
+		w = 0.5*(b-a)*w
+	end subroutine
+
 
 end program dg1d
