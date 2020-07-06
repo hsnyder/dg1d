@@ -212,7 +212,7 @@ contains
 		end if
 
 		! Calculate qprime
-		qprime_el = lineJac * matmul(massinv, (c * matmul(stiff,q) - flx) )
+		qprime_el = lineJac * matmul(massinv, (cFwd * matmul(stiff,q) - flx) )
 
 	end function
 
