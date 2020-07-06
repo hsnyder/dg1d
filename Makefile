@@ -1,5 +1,5 @@
 
-CFLAGS=-g 
+CFLAGS=-g -Wall -pedantic
 
 dg1d: quadrature.F90 dg1d.F90 
 	gfortran $(CFLAGS) $^ -o dg1d 
