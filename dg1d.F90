@@ -15,12 +15,12 @@ program dg1d
     !-------------------------------------------------------------------------------------------------- !
     !   PARAMETERS 
     !-------------------------------------------------------------------------------------------------- 
-    integer, parameter :: Np = 9 ! Number of Gauss-Lagrange points (so order is N-1) 
+    integer, parameter :: Np = 9 ! Number of Gauss-Legendre quadrature points (so solution order is N-1) 
     integer, parameter :: Nel = 5 ! Number of elements in our domain 
     integer, parameter :: Nt = 2000 ! Number of time steps to run for
     integer, parameter :: write_interval = 20 ! write data every x timesteps 
     
-    real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 19.0 ! Total domain to be discretized
+    real(real64), parameter :: DomainX1 = 0.0, DomainX2 = 19.0 ! Total domain to be discretized (1D)
     real(real64), parameter :: c = 1.2 ! Externally-prescribed constant velocity
     real(real64), parameter :: dt = 0.01 ! Time differential
 
@@ -239,7 +239,7 @@ contains
 
 
 
-        ! This is probably inefficient, but I'm going to loop over elements and solve them one at a time. 
+        ! Loop over elements and solve them one at a time. 
         do i = 1, Nel
             delta_x = elementPtsLR(2,i) - elementPtsLR(1,i)
             Jac = [(2.0/(delta_x), i = 1, Np)]
